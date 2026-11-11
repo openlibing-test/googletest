@@ -30,23 +30,26 @@
 
 name: Tests
 
+# Original triggers preserved; manual-only for test cost control.
+# on:
+#   # continuous runs
+#   schedule:
+#     # Run every hour (staggered to avoid top-of-the-hour runner queue spikes)
+#     - cron: "40 * * * *"
+# 
+#   # postsubmit runs
+#   push:
+#     branches:
+#       - main
+# 
+#   # presubmit runs
+#   pull_request:
+#     branches:
+#       - main
+# 
+#   # manual runs
+#   workflow_dispatch:
 on:
-  # continuous runs
-  schedule:
-    # Run every hour (staggered to avoid top-of-the-hour runner queue spikes)
-    - cron: "40 * * * *"
-
-  # postsubmit runs
-  push:
-    branches:
-      - main
-
-  # presubmit runs
-  pull_request:
-    branches:
-      - main
-
-  # manual runs
   workflow_dispatch:
 
 permissions:
