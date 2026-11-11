@@ -4,6 +4,11 @@ name: clang-tidy-scan
 # 仅手动触发，保留测试仓成本控制策略
 on:
   workflow_dispatch:
+    inputs:
+      upload_to_openlibing:
+        description: 'Upload to beta (requires ACTIONS_READ_TOKEN for private upload Action)'
+        type: boolean
+        default: false
 
 # OIDC 免密换证：GitHub 平台使用华为云 IAM 中注册的 GitHubActions 身份提供商
 permissions:
@@ -60,14 +65,26 @@ jobs:
 
           test -s sarif/clang-tidy.sarif || { echo "ERROR: SARIF empty"; exit 1; }
 
-      - name: Upload SARIF to openLiBing
-        if: ${{ always() }}
-        uses: openlibing-test/upload-sarif-action@main
+      # Public repositories cannot directly resolve an organization-private Action.
+      # Optional authenticated checkout keeps private source out of this public repo.
+      - name: Checkout private upload Action when requested
+        if: ${{ always() && inputs.upload_to_openlibing }}
+        uses: actions/checkout@v4
+        with:
+          repository: openlibing-test/upload-sarif-action
+          ref: 0fd322c74908e464f6df593b0a914f66fc287482
+          token: ${{ secrets.ACTIONS_READ_TOKEN }}
+          path: .validation-actions/upload-sarif-action
+          persist-credentials: false
+
+      - name: Upload SARIF to openLiBing beta
+        if: ${{ always() && inputs.upload_to_openlibing }}
+        uses: ./.validation-actions/upload-sarif-action
         with:
           sarif_file: sarif/clang-tidy.sarif
-          source_path: .                          # 源码根目录（C/C++ 通常无统一源码根，传仓库根）
-          category: "business"
+          source_path: .
           env_type: beta
+          category: business
 
       - name: Validate SARIF and compilation coverage
         if: ${{ always() }}

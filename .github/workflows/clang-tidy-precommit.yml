@@ -4,6 +4,11 @@ name: clang-tidy-precommit
 # 仅手动触发，保留测试仓成本控制策略
 on:
   workflow_dispatch:
+    inputs:
+      upload_to_openlibing:
+        description: 'Upload to beta (requires ACTIONS_READ_TOKEN for private upload Action)'
+        type: boolean
+        default: false
 
 # OIDC 免密换证：GitHub 平台使用华为云 IAM 中注册的 GitHubActions 身份提供商
 permissions:
@@ -44,26 +49,40 @@ jobs:
           cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -Dgtest_build_tests=ON -Dgtest_build_samples=ON -Dgmock_build_tests=ON
           test -f build/compile_commands.json || { echo "ERROR: compile_commands.json not generated"; exit 1; }
 
-      # 步骤 1：运行 pre-commit（读取 .pre-commit-config.yaml 执行 clang-tidy local hook）
-      # pre-commit-action 只负责生成/收集 SARIF 报告，上传与回调由下方 upload-sarif-action 完成。
-      # extra_args: --all-files 强制全量扫描；PR 事件按插件约定只做门禁，不生成报告。
+      # The documented private pre-commit Action is inaccessible from this public repo.
+      # Exercise the same local hook using upstream pre-commit; retain its real status.
       - name: run pre-commit (generate sarif)
-        id: pre-commit
-        continue-on-error: true
-        uses: openlibing-test/pre-commit-action@main
-        with:
-          extra_args: "--all-files"
-          report-dir: /tmp/pre-commit-reports/
+        run: |
+          python3 -m pip install pre-commit
+          mkdir -p /tmp/pre-commit-reports
+          set +e
+          pre-commit run clang-tidy --all-files --verbose 2>&1 | tee build/clang-tidy.log
+          hook_exit=${PIPESTATUS[0]}
+          set -e
+          echo "$hook_exit" > build/clang-tidy-exit-code.txt
+          echo "pre-commit exit code: $hook_exit"
+          test -s /tmp/pre-commit-reports/clang-tidy.sarif
 
-      # 步骤 2：上传 SARIF 并回调 openLiBing（OIDC 免密换证）
-      - name: upload sarif reports
-        if: ${{ always() }}
-        uses: openlibing-test/upload-sarif-action@main
+      # Public repositories cannot directly resolve an organization-private Action.
+      # Optional authenticated checkout keeps private source out of this public repo.
+      - name: Checkout private upload Action when requested
+        if: ${{ always() && inputs.upload_to_openlibing }}
+        uses: actions/checkout@v4
         with:
-          sarif_file: ${{ steps.pre-commit.outputs.sarif-files }}
+          repository: openlibing-test/upload-sarif-action
+          ref: 0fd322c74908e464f6df593b0a914f66fc287482
+          token: ${{ secrets.ACTIONS_READ_TOKEN }}
+          path: .validation-actions/upload-sarif-action
+          persist-credentials: false
+
+      - name: Upload SARIF to openLiBing beta
+        if: ${{ always() && inputs.upload_to_openlibing }}
+        uses: ./.validation-actions/upload-sarif-action
+        with:
+          sarif_file: /tmp/pre-commit-reports/clang-tidy.sarif
           source_path: .
           env_type: beta
-          category: "pre-commit-report"
+          category: business
 
       - name: Validate SARIF and compilation coverage
         if: ${{ always() }}
