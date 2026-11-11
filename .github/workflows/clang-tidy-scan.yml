@@ -1,0 +1,88 @@
+name: clang-tidy-scan
+
+# 方案二：workflow 单独使用（GitHub Actions 适配版）
+# 仅手动触发，保留测试仓成本控制策略
+on:
+  workflow_dispatch:
+
+# OIDC 免密换证：GitHub 平台使用华为云 IAM 中注册的 GitHubActions 身份提供商
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: clang-tidy-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clang-tidy:
+    name: clang-tidy-scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang-tidy and cmake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy cmake
+          clang-tidy --version
+
+      # 预置二进制 clang-tidy-sarif：随仓提交，避免 CI 运行时下载外网依赖。
+      # 部分解包方式会丢失可执行位，此处显式 chmod 双保险。
+      - name: Ensure clang-tidy-sarif executable
+        run: |
+          chmod +x .github/bin/clang-tidy-sarif
+          .github/bin/clang-tidy-sarif --version || true
+
+      - name: Build CMake compile_commands.json
+        run: |
+          # 仅配置阶段产出 compile_commands.json，不执行编译，节省时间
+          cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -Dgtest_build_tests=ON -Dgtest_build_samples=ON -Dgmock_build_tests=ON
+          test -f build/compile_commands.json || { echo "ERROR: compile_commands.json not generated"; exit 1; }
+
+      - name: clang-tidy scan and convert to SARIF
+        run: |
+          set -o pipefail
+          mkdir -p sarif
+          # wrapper 自动完成：编译数据库提取源文件 + 数据库层去重 + 实时 tee stdout/stderr + 生成 SARIF
+          # 非 pre-commit 模式使用 clang-tidy 原始退出码，扫到问题不阻断（|| echo 兜底，仍上传 SARIF）
+          set +e
+          python3 scripts/run-clang-tidy.py \
+            --_cdb build/compile_commands.json \
+            --_clang-tidy-sarif .github/bin/clang-tidy-sarif \
+            --_sarif-output sarif/clang-tidy.sarif 2>&1 | tee build/clang-tidy.log
+          scan_exit=${PIPESTATUS[0]}
+          set -e
+          echo "$scan_exit" > build/clang-tidy-exit-code.txt
+          if [ "$scan_exit" -ne 0 ]; then echo "clang-tidy exited non-zero; retaining report for diagnosis"; fi
+
+          test -s sarif/clang-tidy.sarif || { echo "ERROR: SARIF empty"; exit 1; }
+
+      - name: Upload SARIF to openLiBing
+        if: ${{ always() }}
+        uses: openlibing-test/upload-sarif-action@main
+        with:
+          sarif_file: sarif/clang-tidy.sarif
+          source_path: .                          # 源码根目录（C/C++ 通常无统一源码根，传仓库根）
+          category: "business"
+          env_type: beta
+
+      - name: Validate SARIF and compilation coverage
+        if: ${{ always() }}
+        run: python3 scripts/inspect-clang-tidy-report.py build/compile_commands.json sarif/clang-tidy.sarif
+
+      - name: Retain validation evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-scan-evidence
+          if-no-files-found: error
+          path: |
+            build/compile_commands.json
+            build/cdb-deduped/compile_commands.json
+            build/clang-tidy-summary.json
+            build/clang-tidy.log
+            build/clang-tidy-exit-code.txt
+            sarif/clang-tidy.sarif

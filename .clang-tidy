@@ -1,0 +1,78 @@
+# .clang-tidy 配置文件
+# 文档：https://clang.llvm.org/extra/clang-tidy/
+#
+# 本配置面向 C 代码仓全量静态检查，开启覆盖面较广的规则集合；
+# 设计文档明确不返回 CERT/CWE 字段，但 clang-tidy 的 cert-* 检查仍可启用
+# （规则 ID 中的 "cert-" 前缀仅用于命名，不影响 SARIF 输出形态）。
+
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  cert-*,
+  cppcoreguidelines-pro-type-cstyle-cast,
+  cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  cppcoreguidelines-pro-bounds-constant-array-index,
+  cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  cppcoreguidelines-no-malloc,
+  cppcoreguidelines-avoid-magic-numbers,
+  cppcoreguidelines-owning-memory,
+  misc-*,
+  -misc-non-private-member-variables-in-classes,
+  performance-*,
+  readability-*,
+  modernize-*,
+  -modernize-use-nullptr,
+  -modernize-use-override,
+  -modernize-use-trailing-return-type,
+  altera-*,
+  hicpp-*,
+  -hicpp-avoid-c-arrays,
+  -hicpp-no-array-decay,
+  -hicpp-no-malloc
+
+# 对部分规则启用告警而非错误，避免流水线过度红色
+WarningsAsErrors: ''
+
+# 头文件过滤：只对 src/ 下的头文件做诊断（系统头不告警）
+# 留空则相当于不过滤（默认只显示用户代码的诊断，系统头不告警）
+# HeaderFilterRegex: 'src/.*\.h$'
+
+# 命名规范（readability-identifier-naming）：C 风格 snake_case
+CheckOptions:
+  - key:   readability-identifier-naming.VariableCase
+    value: lower_case
+  - key:   readability-identifier-naming.FunctionCase
+    value: lower_case
+  - key:   readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key:   readability-identifier-naming.ConstantCase
+    value: UPPER_CASE
+  - key:   readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+  - key:   readability-identifier-naming.StructCase
+    value: lower_case
+  - key:   readability-identifier-naming.TypedefCase
+    value: lower_case
+  - key:   readability-identifier-naming.NamespaceCase
+    value: lower_case
+  - key:   readability-identifier-naming.ClassMemberCase
+    value: lower_case
+  - key:   readability-identifier-naming.StaticVariableCase
+    value: lower_case
+  - key:   readability-identifier-naming.GlobalConstantCase
+    value: UPPER_CASE
+  - key:   readability-identifier-naming.GlobalVariableCase
+    value: lower_case
+  # 性能：避免不必要的拷贝初始化
+  - key:   performance-unnecessary-value-param.ParamType
+    value: '(.*)\\w+&'
+  # 缩进检查的空白字符设置
+  - key:   readability-misleading-indentation.Width
+    value: '4'
+  # cognitive complexity 阈值（默认 25）
+  - key:   readability-function-cognitive-complexity.Threshold
+    value: '10'
+  # misc-unused-parameters 严格模式
+  - key:   misc-unused-parameters.StrictMode
+    value: '1'

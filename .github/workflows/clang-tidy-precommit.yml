@@ -1,0 +1,84 @@
+name: clang-tidy-precommit
+
+# 方案一：pre-commit 集成（GitHub Actions 适配版）
+# 仅手动触发，保留测试仓成本控制策略
+on:
+  workflow_dispatch:
+
+# OIDC 免密换证：GitHub 平台使用华为云 IAM 中注册的 GitHubActions 身份提供商
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: clang-tidy-precommit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pre-commit:
+    name: pre-commit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install clang-tidy and cmake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy cmake
+          clang-tidy --version
+
+      - name: Ensure clang-tidy-sarif executable
+        run: |
+          chmod +x .github/bin/clang-tidy-sarif
+          .github/bin/clang-tidy-sarif --version || true
+
+      - name: Build CMake compile_commands.json
+        run: |
+          cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -Dgtest_build_tests=ON -Dgtest_build_samples=ON -Dgmock_build_tests=ON
+          test -f build/compile_commands.json || { echo "ERROR: compile_commands.json not generated"; exit 1; }
+
+      # 步骤 1：运行 pre-commit（读取 .pre-commit-config.yaml 执行 clang-tidy local hook）
+      # pre-commit-action 只负责生成/收集 SARIF 报告，上传与回调由下方 upload-sarif-action 完成。
+      # extra_args: --all-files 强制全量扫描；PR 事件按插件约定只做门禁，不生成报告。
+      - name: run pre-commit (generate sarif)
+        id: pre-commit
+        continue-on-error: true
+        uses: openlibing-test/pre-commit-action@main
+        with:
+          extra_args: "--all-files"
+          report-dir: /tmp/pre-commit-reports/
+
+      # 步骤 2：上传 SARIF 并回调 openLiBing（OIDC 免密换证）
+      - name: upload sarif reports
+        if: ${{ always() }}
+        uses: openlibing-test/upload-sarif-action@main
+        with:
+          sarif_file: ${{ steps.pre-commit.outputs.sarif-files }}
+          source_path: .
+          env_type: beta
+          category: "pre-commit-report"
+
+      - name: Validate SARIF and compilation coverage
+        if: ${{ always() }}
+        run: python3 scripts/inspect-clang-tidy-report.py build/compile_commands.json /tmp/pre-commit-reports/clang-tidy.sarif
+
+      - name: Retain validation evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-precommit-evidence
+          if-no-files-found: error
+          path: |
+            build/compile_commands.json
+            build/cdb-deduped/compile_commands.json
+            build/clang-tidy-summary.json
+            build/clang-tidy.log
+            build/clang-tidy-exit-code.txt
+            /tmp/pre-commit-reports/clang-tidy.sarif

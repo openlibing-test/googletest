@@ -1,0 +1,40 @@
+# .pre-commit-config.yaml
+# 方案一（pre-commit 集成）的 local hook 配置
+# 设计文档 §2.2.1
+#
+# 零外网依赖约束：默认执行机无法直连 github.com，
+# 因此只使用 local hook，不引用 https://github.com/pre-commit/pre-commit-hooks 等远程 repo。
+# trailing-whitespace / end-of-file-fixer / check-yaml / check-added-large-files 等通用 hook
+# 已由 GitCode CI 流水线自带的 pre-commit 钩子或本地 git hook 覆盖，无需在此重复配置。
+
+repos:
+  # ===================== C/C++ 语言 =====================
+  # clang-tidy：C/C++ 静态检查（local hook，依赖本机 clang-tidy + build/compile_commands.json）
+  # entry 调 Python wrapper 脚本：
+  #   - 用户传给 clang-tidy 的参数自动转发（如 --config-file=.clang-tidy / --quiet / --header-filter=^$）
+  #   - 脚本自己的参数用 --_ 前缀区分（如 --_sarif-output / --_cdb / --_no-sarif）
+  #   - 实时 tee stdout+stderr：诊断行输出到 CI 日志 + pipe 给 clang-tidy-sarif 生成 SARIF
+  #   - 编译数据库去重：按 file 保留首条记录（多 target 共用源文件时避免重复扫描），
+  #     去重结果另存 <cdb 目录>/cdb-deduped/ 作为 clang-tidy 的 -p 目录
+  #   - 失败语义（双模式）：
+  #       pre-commit 集成（PRE_COMMIT=1）：检测诊断行（warning/error），有诊断返回非零退出码，
+  #         不依赖 clang-tidy 退出码（.clang-tidy 的 WarningsAsErrors 默认为空，warning 不影响退出码）
+  #       CI workflow / 手动运行：用 clang-tidy 原始退出码，行为不变
+  #   - SARIF 路径相对化由 pre-commit-action / upload-sarif-action 插件内置处理
+  # clang-tidy-sarif 二进制已预置在 .github/bin/（git 模式 100755），本地使用前无需手动下载。
+  - repo: local
+    hooks:
+      - id: clang-tidy
+        name: clang-tidy check
+        language: system
+        entry: python3 scripts/run-clang-tidy.py
+        pass_filenames: false             # 整仓分析，不逐个文件传参（全量扫描硬目标）
+        types_or: [ c, c++ ]
+        # 用户参数可在此追加，自动转发给 clang-tidy（参考 DrivingSDK 仓用法）：
+        # args:
+        #   - --config-file=.clang-tidy
+        #   - --quiet
+        #   - --header-filter=^$
+        # 脚本参数（可选）：
+        #   - --_sarif-output=/tmp/pre-commit-reports/clang-tidy.sarif
+        #   - --_no-sarif   # 本地拦截模式，只跑 clang-tidy 不生成 SARIF
