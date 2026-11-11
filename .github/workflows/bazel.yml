@@ -30,56 +30,59 @@
 
 name: Bazel Tests
 
+# Original triggers preserved; manual-only for test cost control.
+# on:
+#   workflow_call:
+#     inputs:
+#       os:
+#         description: "GitHub Actions runner OS (e.g. ubuntu-24.04, macos-latest, windows-2022)"
+#         required: true
+#         type: string
+#       toolchain:
+#         description: "Bazel toolchain config (--config=<toolchain>)"
+#         required: true
+#         type: string
+#       remote_config:
+#         description: "Bazel remote config (--config=<remote_config>)"
+#         required: false
+#         default: "remote"
+#         type: string
+#       container_image:
+#         description: "Docker container image to run in (empty string or 'none' for host execution)"
+#         required: false
+#         default: ""
+#         type: string
+#       bazel_version:
+#         description: "Bazel version for Bazelisk (e.g. 9.x, 8.x)"
+#         required: false
+#         default: "9.x"
+#         type: string
+#       extra_bazel_args:
+#         description: "Additional arguments passed to bazel test"
+#         required: false
+#         default: ""
+#         type: string
+#       stds:
+#         description: "JSON array of C++ standards to test"
+#         required: false
+#         default: '["c++17", "c++20", "c++23"]'
+#         type: string
+#       compilation_mode:
+#         description: "Bazel compilation mode (--compilation_mode=<mode>)"
+#         required: false
+#         default: "fastbuild"
+#         type: string
+#       absls:
+#         description: "JSON array of absl flag values to test (0, 1)"
+#         required: false
+#         default: '[0, 1]'
+#         type: string
+#     secrets:
+#       GAR_SERVICE_ACCOUNT:
+#         description: "Google Cloud service account key JSON for Artifact Registry and remote cache/RBE"
+#         required: false
 on:
-  workflow_call:
-    inputs:
-      os:
-        description: "GitHub Actions runner OS (e.g. ubuntu-24.04, macos-latest, windows-2022)"
-        required: true
-        type: string
-      toolchain:
-        description: "Bazel toolchain config (--config=<toolchain>)"
-        required: true
-        type: string
-      remote_config:
-        description: "Bazel remote config (--config=<remote_config>)"
-        required: false
-        default: "remote"
-        type: string
-      container_image:
-        description: "Docker container image to run in (empty string or 'none' for host execution)"
-        required: false
-        default: ""
-        type: string
-      bazel_version:
-        description: "Bazel version for Bazelisk (e.g. 9.x, 8.x)"
-        required: false
-        default: "9.x"
-        type: string
-      extra_bazel_args:
-        description: "Additional arguments passed to bazel test"
-        required: false
-        default: ""
-        type: string
-      stds:
-        description: "JSON array of C++ standards to test"
-        required: false
-        default: '["c++17", "c++20", "c++23"]'
-        type: string
-      compilation_mode:
-        description: "Bazel compilation mode (--compilation_mode=<mode>)"
-        required: false
-        default: "fastbuild"
-        type: string
-      absls:
-        description: "JSON array of absl flag values to test (0, 1)"
-        required: false
-        default: '[0, 1]'
-        type: string
-    secrets:
-      GAR_SERVICE_ACCOUNT:
-        description: "Google Cloud service account key JSON for Artifact Registry and remote cache/RBE"
-        required: false
+  workflow_dispatch:
 
 permissions:
   contents: read
