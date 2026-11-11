@@ -30,42 +30,45 @@
 
 name: CMake Tests
 
+# Original triggers preserved; manual-only for test cost control.
+# on:
+#   workflow_call:
+#     inputs:
+#       os:
+#         description: "GitHub Actions runner OS (e.g. ubuntu-24.04, macos-latest, windows-2022)"
+#         required: true
+#         type: string
+#       container_image:
+#         description: "Docker container image to run in (empty string for host execution)"
+#         required: false
+#         default: ""
+#         type: string
+#       compiler:
+#         description: "Compiler toolchain to use on Linux (gcc or clang)"
+#         required: false
+#         default: "gcc"
+#         type: string
+#       build_types:
+#         description: "JSON array of CMAKE_BUILD_TYPE values to test"
+#         required: false
+#         default: '["Debug", "Release"]'
+#         type: string
+#       link_modes:
+#         description: "JSON array of link modes to test (static, shared)"
+#         required: false
+#         default: '["static", "shared"]'
+#         type: string
+#       install_test:
+#         description: "Whether to run the CMake installation integration test"
+#         required: false
+#         default: false
+#         type: boolean
+#     secrets:
+#       GAR_SERVICE_ACCOUNT:
+#         description: "Google Cloud service account key JSON for Artifact Registry, RBE, and sccache"
+#         required: false
 on:
-  workflow_call:
-    inputs:
-      os:
-        description: "GitHub Actions runner OS (e.g. ubuntu-24.04, macos-latest, windows-2022)"
-        required: true
-        type: string
-      container_image:
-        description: "Docker container image to run in (empty string for host execution)"
-        required: false
-        default: ""
-        type: string
-      compiler:
-        description: "Compiler toolchain to use on Linux (gcc or clang)"
-        required: false
-        default: "gcc"
-        type: string
-      build_types:
-        description: "JSON array of CMAKE_BUILD_TYPE values to test"
-        required: false
-        default: '["Debug", "Release"]'
-        type: string
-      link_modes:
-        description: "JSON array of link modes to test (static, shared)"
-        required: false
-        default: '["static", "shared"]'
-        type: string
-      install_test:
-        description: "Whether to run the CMake installation integration test"
-        required: false
-        default: false
-        type: boolean
-    secrets:
-      GAR_SERVICE_ACCOUNT:
-        description: "Google Cloud service account key JSON for Artifact Registry, RBE, and sccache"
-        required: false
+  workflow_dispatch:
 
 permissions:
   contents: read
