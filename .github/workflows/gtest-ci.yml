@@ -1,8 +1,11 @@
 name: ci
 
+# Original triggers preserved; manual-only for test cost control.
+# on:
+#   push:
+#   pull_request:
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
 
 env:
   BAZEL_CXXOPTS: -std=c++14
