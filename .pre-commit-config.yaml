@@ -38,3 +38,6 @@ repos:
         # 脚本参数（可选）：
         #   - --_sarif-output=/tmp/pre-commit-reports/clang-tidy.sarif
         #   - --_no-sarif   # 本地拦截模式，只跑 clang-tidy 不生成 SARIF
+
+        args:
+          - --_clang-tidy-sarif=.github/bin/clang-tidy-sarif
