@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       upload_to_openlibing:
-        description: 'Upload to beta (requires ACTIONS_READ_TOKEN for private upload Action)'
+        description: 'Upload to beta (requires PRIVATE_ACTIONS_READ_TOKEN for private upload Action)'
         type: boolean
         default: false
 
@@ -73,7 +73,7 @@ jobs:
         with:
           repository: openlibing-test/upload-sarif-action
           ref: 0fd322c74908e464f6df593b0a914f66fc287482
-          token: ${{ secrets.ACTIONS_READ_TOKEN }}
+          token: ${{ secrets.PRIVATE_ACTIONS_READ_TOKEN }}
           path: .validation-actions/upload-sarif-action
           persist-credentials: false
 

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       upload_to_openlibing:
-        description: 'Upload to beta (requires ACTIONS_READ_TOKEN for private upload Action)'
+        description: 'Upload to beta (requires PRIVATE_ACTIONS_READ_TOKEN for private upload Action)'
         type: boolean
         default: false
 
@@ -49,19 +49,22 @@ jobs:
           cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -Dgtest_build_tests=ON -Dgtest_build_samples=ON -Dgmock_build_tests=ON
           test -f build/compile_commands.json || { echo "ERROR: compile_commands.json not generated"; exit 1; }
 
-      # The documented private pre-commit Action is inaccessible from this public repo.
-      # Exercise the same local hook using upstream pre-commit; retain its real status.
+      - name: Checkout private pre-commit Action
+        uses: actions/checkout@v4
+        with:
+          repository: openlibing-test/pre-commit-action
+          ref: 387ad199beaa628c03ca620ea8c2512a6f9fffc0
+          token: ${{ secrets.PRIVATE_ACTIONS_READ_TOKEN }}
+          path: .validation-actions/pre-commit-action
+          persist-credentials: false
+
       - name: run pre-commit (generate sarif)
-        run: |
-          python3 -m pip install pre-commit
-          mkdir -p /tmp/pre-commit-reports
-          set +e
-          pre-commit run clang-tidy --all-files --verbose 2>&1 | tee build/clang-tidy.log
-          hook_exit=${PIPESTATUS[0]}
-          set -e
-          echo "$hook_exit" > build/clang-tidy-exit-code.txt
-          echo "pre-commit exit code: $hook_exit"
-          test -s /tmp/pre-commit-reports/clang-tidy.sarif
+        id: pre-commit
+        continue-on-error: true
+        uses: ./.validation-actions/pre-commit-action
+        with:
+          extra_args: --all-files
+          report-dir: /tmp/pre-commit-reports/
 
       # Public repositories cannot directly resolve an organization-private Action.
       # Optional authenticated checkout keeps private source out of this public repo.
@@ -71,7 +74,7 @@ jobs:
         with:
           repository: openlibing-test/upload-sarif-action
           ref: 0fd322c74908e464f6df593b0a914f66fc287482
-          token: ${{ secrets.ACTIONS_READ_TOKEN }}
+          token: ${{ secrets.PRIVATE_ACTIONS_READ_TOKEN }}
           path: .validation-actions/upload-sarif-action
           persist-credentials: false
 
