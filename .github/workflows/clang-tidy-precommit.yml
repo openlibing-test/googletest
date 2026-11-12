@@ -58,9 +58,21 @@ jobs:
           path: .validation-actions/pre-commit-action
           persist-credentials: false
 
+      # The Action searches for .git recursively unless repo_workspace is present.
+      # Keep its workspace selector outside the source tree to avoid recursive links
+      # and force it to use this repository rather than its own nested checkout.
+      - name: Select GoogleTest workspace for pre-commit
+        env:
+          PRECOMMIT_WORKSPACE: ${{ runner.temp }}/googletest-precommit-workspace
+        run: |
+          mkdir -p "$PRECOMMIT_WORKSPACE"
+          ln -s "$GITHUB_WORKSPACE" "$PRECOMMIT_WORKSPACE/repo_workspace"
+          test "$(readlink -f "$PRECOMMIT_WORKSPACE/repo_workspace")" = "$GITHUB_WORKSPACE"
+
       - name: run pre-commit (generate sarif)
         id: pre-commit
-        continue-on-error: true
+        env:
+          WORKSPACE: ${{ runner.temp }}/googletest-precommit-workspace
         uses: ./.validation-actions/pre-commit-action
         with:
           extra_args: --all-files
